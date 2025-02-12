@@ -63,6 +63,7 @@ export default function AdminGallery() {
       if (!response.ok) throw new Error("Failed to fetch images")
       
       const data = await response.json()
+      console.log('Gallery data:', data) // Debug log
       setImages((prev) => [...prev, ...data.items])
       setHasMore(data.has_next)
       setPage((p) => p + 1)
