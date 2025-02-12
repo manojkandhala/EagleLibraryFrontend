@@ -20,8 +20,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { Search, SortAsc, SortDesc } from "lucide-react"
+import { Search, SortAsc, SortDesc, Loader2 } from "lucide-react"
 import { useUserGallery } from "@/hooks/useQueries"
+import { useRouter } from "next/navigation"
 
 interface ImageObject {
   id: number
@@ -60,6 +61,10 @@ export default function UserGallery() {
     delay: 100,
   })
 
+  const router = useRouter()
+
+  const [processingId, setProcessingId] = useState<number | null>(null)
+
   // Memoize params creation to prevent unnecessary re-renders
   const params = useCallback(() => {
     const p = new URLSearchParams({
@@ -77,6 +82,14 @@ export default function UserGallery() {
 
   const { data, isLoading, error, refetch } = useUserGallery(params())
   const hasMore = data?.has_next || false
+
+  // Refetch data when component mounts or user returns to the page
+  useEffect(() => {
+    // Reset page and images before refetching
+    setPage(1)
+    setAllImages([])
+    refetch()
+  }, [refetch])
 
   // Update allImages when new data arrives
   useEffect(() => {
@@ -116,6 +129,7 @@ export default function UserGallery() {
   }, [])
 
   const handleStartProcessing = async (imageId: number) => {
+    setProcessingId(imageId)
     try {
       const response = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL}/images/${imageId}/process-request`,
@@ -126,12 +140,19 @@ export default function UserGallery() {
           },
         }
       )
-      if (!response.ok) throw new Error("Failed to start processing")
       
-      // Refetch the gallery data
-      refetch()
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.detail || "Failed to start processing")
+      }
+      
+      // Redirect to processing page on success
+      router.push('/user/processing')
     } catch (err) {
       console.error("Error starting processing:", err)
+      alert(err instanceof Error ? err.message : "Failed to start processing")
+    } finally {
+      setProcessingId(null)
     }
   }
 
@@ -240,9 +261,17 @@ export default function UserGallery() {
               <p className="text-sm text-muted-foreground line-clamp-1 mb-4">{image.artist}</p>
               <Button
                 onClick={() => handleStartProcessing(image.id)}
+                disabled={processingId === image.id}
                 className="w-full"
               >
-                Start Processing
+                {processingId === image.id ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Starting Process...
+                  </>
+                ) : (
+                  'Start Processing'
+                )}
               </Button>
             </CardContent>
           </Card>

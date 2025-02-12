@@ -5,8 +5,9 @@ import { useUserProcessing } from "@/hooks/useQueries"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
-import { AlertCircle, Download, ImageIcon, Loader2, Upload } from "lucide-react"
+import { AlertCircle, Download, ImageIcon, Loader2, Upload, ArrowUpRight } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { useRouter } from "next/navigation"
 
 interface ProcessingImage {
   id: number
@@ -34,6 +35,7 @@ interface ProcessingImage {
 export default function ProcessingPage() {
   const [uploadingId, setUploadingId] = useState<number | null>(null)
   const { data, isLoading, error, refetch } = useUserProcessing()
+  const router = useRouter()
 
   const handleDownload = (imageUrl: string, imageId: number) => {
     const downloadLink = document.createElement('a')
@@ -121,9 +123,16 @@ export default function ProcessingPage() {
               <ImageIcon className="h-6 w-6 text-primary" />
             </div>
             <CardTitle className="text-xl font-semibold mb-2">No Processing Images</CardTitle>
-            <CardDescription className="max-w-sm">
-              You don't have any images assigned for processing at the moment.
+            <CardDescription className="max-w-sm mb-4">
+              You don't have any images being processed at the moment. Visit the gallery to discover and start processing new images.
             </CardDescription>
+            <Button
+              onClick={() => router.push("/user/gallery")}
+              className="gap-2"
+            >
+              <ArrowUpRight className="h-4 w-4" />
+              Go to Gallery
+            </Button>
           </CardContent>
         </Card>
       ) : (

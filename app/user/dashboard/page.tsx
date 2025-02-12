@@ -49,16 +49,6 @@ export default function UserDashboard() {
             Track your image processing activities and progress
           </p>
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => refetch()}
-          disabled={isRefetching}
-          className="gap-2 transition-all hover:shadow-md"
-        >
-          <RefreshCcw className={cn("h-4 w-4", isRefetching && "animate-spin")} />
-          Refresh Now
-        </Button>
       </div>
 
       {error && (
