@@ -38,6 +38,11 @@ interface ImageObject {
   }>
 }
 
+// Add proper type instead of any
+interface ErrorResponse {
+  detail: string;
+}
+
 export default function ImageDetailsPage() {
   const { id } = useParams()
   const router = useRouter()
@@ -46,10 +51,6 @@ export default function ImageDetailsPage() {
   const [error, setError] = useState("")
   const [isUpdating, setIsUpdating] = useState(false)
   const [updatedImage, setUpdatedImage] = useState<Partial<ImageObject>>({})
-
-  useEffect(() => {
-    fetchImageDetails()
-  }, [id])
 
   const fetchImageDetails = async () => {
     try {
@@ -71,6 +72,10 @@ export default function ImageDetailsPage() {
       setLoading(false)
     }
   }
+
+  useEffect(() => {
+    fetchImageDetails()
+  }, []) // Remove fetchImageDetails from deps as it's defined in component
 
   const handleUpdateImage = async (e: React.FormEvent) => {
     e.preventDefault()

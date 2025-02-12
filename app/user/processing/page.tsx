@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback } from "react"
+import { useState } from "react"
 import { useUserProcessing } from "@/hooks/useQueries"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
@@ -124,7 +124,7 @@ export default function ProcessingPage() {
             </div>
             <CardTitle className="text-xl font-semibold mb-2">No Processing Images</CardTitle>
             <CardDescription className="max-w-sm mb-4">
-              You don't have any images being processed at the moment. Visit the gallery to discover and start processing new images.
+              You don&apos;t have any images being processed at the moment. Visit the gallery to discover and start processing new images.
             </CardDescription>
             <Button
               onClick={() => router.push("/user/gallery")}

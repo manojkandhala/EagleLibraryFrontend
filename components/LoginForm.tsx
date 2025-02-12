@@ -51,9 +51,10 @@ export default function LoginForm() {
         localStorage.setItem("refresh_token", data.refresh_token)
         router.push(data.role === "admin" ? "/admin/dashboard" : "/user/dashboard")
       } else {
-        setError("Invalid credentials")
+        const errorData = await response.json()
+        setError(errorData.detail || "Invalid credentials")
       }
-    } catch (error) {
+    } catch (err) {
       setError("An error occurred. Please try again.")
     } finally {
       setIsLoading(false)

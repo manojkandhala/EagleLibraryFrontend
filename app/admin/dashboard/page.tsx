@@ -66,7 +66,7 @@ export default function AdminDashboard() {
             Dashboard Overview
           </h1>
           <p className="text-muted-foreground text-sm">
-            Monitor your system's performance and user activities
+            Monitor your system&apos;s performance and user activities
           </p>
         </div>
         <Button

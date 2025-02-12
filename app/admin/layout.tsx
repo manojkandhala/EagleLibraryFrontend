@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { ReactNode } from "react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
@@ -15,17 +15,10 @@ import {
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { useCurrentUser } from "@/hooks/useQueries"
 
-interface UserProfile {
-  id: number
-  email: string
-  username: string
-  role: string
-}
-
 export default function AdminLayout({
   children,
 }: {
-  children: React.ReactNode
+  children: ReactNode
 }) {
   const pathname = usePathname()
   const router = useRouter()

@@ -1,9 +1,9 @@
 "use client"
 
 import { useUserStats } from "@/hooks/useQueries"
-import { Activity, CheckCircle, Clock, ImageIcon, RefreshCcw, TrendingUp } from "lucide-react"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Activity, CheckCircle, Clock, ImageIcon, TrendingUp } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { cn } from "@/lib/utils"
 
@@ -14,7 +14,7 @@ interface UserStats {
   completed: number
 }
 
-export default function UserDashboard() {
+export default function DashboardPage() {
   const { data: stats, isLoading, error, refetch, isRefetching } = useUserStats()
 
   if (isLoading) {
