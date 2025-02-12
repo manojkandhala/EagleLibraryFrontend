@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Label } from "@/components/ui/label"
 import Image from "next/image"
 import { useInView } from "react-intersection-observer"
+import { useRouter } from "next/navigation"
 
 interface ImageObject {
   id: number
@@ -33,6 +34,7 @@ interface ImageObject {
 }
 
 export default function AdminGallery() {
+  const router = useRouter()
   const [images, setImages] = useState<ImageObject[]>([])
   const [selectedImage, setSelectedImage] = useState<ImageObject | null>(null)
   const [isUpdateImageOpen, setIsUpdateImageOpen] = useState(false)
@@ -215,9 +217,12 @@ export default function AdminGallery() {
       
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {images.map((image) => (
-          <Card key={image.id} className="overflow-hidden">
+          <Card key={image.id} className="overflow-hidden group">
             <CardContent className="p-4">
-              <div className="relative aspect-video mb-4">
+              <div 
+                className="relative aspect-video mb-4 cursor-pointer group-hover:opacity-75 transition-opacity"
+                onClick={() => router.push(`/admin/gallery/${image.id}`)}
+              >
                 <Image
                   src={image.urls.thumbnails.medium}
                   alt={image.title}
@@ -228,7 +233,12 @@ export default function AdminGallery() {
                   loading="lazy"
                 />
               </div>
-              <h2 className="text-lg font-semibold line-clamp-1">{image.title}</h2>
+              <h2 
+                className="text-lg font-semibold line-clamp-1 cursor-pointer hover:text-primary"
+                onClick={() => router.push(`/admin/gallery/${image.id}`)}
+              >
+                {image.title}
+              </h2>
               <p className="text-sm text-muted-foreground line-clamp-1">{image.artist}</p>
               <div className="mt-4 flex gap-2">
                 <Button
@@ -241,7 +251,7 @@ export default function AdminGallery() {
                   size="sm"
                   className="flex-1"
                 >
-                  Update
+                  Quick Update
                 </Button>
                 <Button 
                   onClick={() => handleDeleteImage(image.id)} 
