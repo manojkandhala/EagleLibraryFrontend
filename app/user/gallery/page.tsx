@@ -31,8 +31,10 @@ interface ImageObject {
   urls: {
     original: string
     thumbnails: {
+      small: string
       medium: string
       large: string
+      xlarge: string
     }
   }
 }
@@ -214,7 +216,7 @@ export default function UserGallery() {
                 onClick={() => setSelectedImage(image)}
               >
                 <Image
-                  src={image.urls.thumbnails.medium}
+                  src={image.urls.thumbnails.small}
                   alt={image.title}
                   fill
                   className="object-cover hover:opacity-90 transition-opacity"

@@ -224,7 +224,7 @@ export default function AdminGallery() {
                 onClick={() => router.push(`/admin/gallery/${image.id}`)}
               >
                 <Image
-                  src={image.urls.thumbnails.medium}
+                  src={image.urls.thumbnails.small}
                   alt={image.title}
                   fill
                   className="object-cover"
