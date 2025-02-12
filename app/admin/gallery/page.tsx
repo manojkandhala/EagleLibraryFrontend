@@ -41,6 +41,11 @@ export default function AdminGallery() {
   const [loading, setLoading] = useState(false)
   const [hasMore, setHasMore] = useState(true)
   const [error, setError] = useState("")
+  const [searchTerm, setSearchTerm] = useState("")
+  const [orientation, setOrientation] = useState<"" | "horizontal" | "vertical" | "other">("")
+  const [museum, setMuseum] = useState("")
+  const [sortBy, setSortBy] = useState<"created_at" | "title" | "artist">("created_at")
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc")
   
   const { ref, inView } = useInView({
     threshold: 0,
@@ -52,8 +57,19 @@ export default function AdminGallery() {
 
     setLoading(true)
     try {
+      const params = new URLSearchParams({
+        page: page.toString(),
+        page_size: "12",
+        sort_by: sortBy,
+        sort_order: sortOrder,
+      })
+
+      if (searchTerm) params.append("search_term", searchTerm)
+      if (orientation) params.append("orientation", orientation)
+      if (museum) params.append("museum", museum)
+
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/images?page=${page}&page_size=12`,
+        `${process.env.NEXT_PUBLIC_API_URL}/images?${params.toString()}`,
         {
           headers: {
             Authorization: `Bearer ${localStorage.getItem("token")}`,
@@ -63,8 +79,11 @@ export default function AdminGallery() {
       if (!response.ok) throw new Error("Failed to fetch images")
       
       const data = await response.json()
-      console.log('Gallery data:', data) // Debug log
-      setImages((prev) => [...prev, ...data.items])
+      if (page === 1) {
+        setImages(data.items)
+      } else {
+        setImages((prev) => [...prev, ...data.items])
+      }
       setHasMore(data.has_next)
       setPage((p) => p + 1)
       setError("")
@@ -74,10 +93,17 @@ export default function AdminGallery() {
     } finally {
       setLoading(false)
     }
-  }, [page, loading, hasMore])
+  }, [page, loading, hasMore, searchTerm, orientation, museum, sortBy, sortOrder])
 
   useEffect(() => {
-    if (inView) {
+    setPage(1)
+    setImages([])
+    setHasMore(true)
+    fetchImages()
+  }, [searchTerm, orientation, museum, sortBy, sortOrder])
+
+  useEffect(() => {
+    if (inView && page > 1) {
       fetchImages()
     }
   }, [inView, fetchImages])
@@ -98,6 +124,9 @@ export default function AdminGallery() {
       if (response.ok) {
         setIsUpdateImageOpen(false)
         setUpdatedImage({})
+        setPage(1)
+        setImages([])
+        setHasMore(true)
         fetchImages()
       } else {
         console.error("Failed to update image")
@@ -128,13 +157,61 @@ export default function AdminGallery() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-3xl font-bold">Admin Gallery</h1>
+      <div className="flex justify-between items-center">
+        <h1 className="text-3xl font-bold">Admin Gallery</h1>
+      </div>
       
       {error && (
         <div className="bg-destructive/15 text-destructive px-4 py-2 rounded-md">
           {error}
         </div>
       )}
+
+      <div className="grid gap-4">
+        <div className="flex flex-col sm:flex-row gap-4">
+          <Input
+            placeholder="Search by title, artist, or tags..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="flex-1"
+          />
+          <select
+            value={orientation}
+            onChange={(e) => setOrientation(e.target.value as any)}
+            className="h-10 rounded-md border border-input bg-transparent px-3 py-1"
+          >
+            <option value="">All Orientations</option>
+            <option value="horizontal">Horizontal</option>
+            <option value="vertical">Vertical</option>
+            <option value="other">Other</option>
+          </select>
+          <Input
+            placeholder="Filter by museum..."
+            value={museum}
+            onChange={(e) => setMuseum(e.target.value)}
+            className="flex-1 sm:max-w-[200px]"
+          />
+        </div>
+        <div className="flex gap-4">
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value as any)}
+            className="h-10 rounded-md border border-input bg-transparent px-3 py-1"
+          >
+            <option value="created_at">Sort by Date</option>
+            <option value="title">Sort by Title</option>
+            <option value="artist">Sort by Artist</option>
+          </select>
+          <select
+            value={sortOrder}
+            onChange={(e) => setSortOrder(e.target.value as any)}
+            className="h-10 rounded-md border border-input bg-transparent px-3 py-1"
+          >
+            <option value="desc">Descending</option>
+            <option value="asc">Ascending</option>
+          </select>
+        </div>
+      </div>
       
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {images.map((image) => (
@@ -180,7 +257,6 @@ export default function AdminGallery() {
         ))}
       </div>
       
-      {/* Infinite scroll trigger */}
       <div ref={ref} className="h-10">
         {loading && (
           <div className="flex justify-center">
@@ -196,69 +272,83 @@ export default function AdminGallery() {
           </DialogHeader>
           <form onSubmit={handleUpdateImage}>
             <div className="grid gap-4 py-4">
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="title" className="text-right">
-                  Title
-                </Label>
-                <Input
-                  id="title"
-                  value={updatedImage.title || ""}
-                  onChange={(e) => setUpdatedImage({ ...updatedImage, title: e.target.value })}
-                  className="col-span-3"
-                />
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="artist" className="text-right">
-                  Artist
-                </Label>
-                <Input
-                  id="artist"
-                  value={updatedImage.artist || ""}
-                  onChange={(e) => setUpdatedImage({ ...updatedImage, artist: e.target.value })}
-                  className="col-span-3"
-                />
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="museum" className="text-right">
-                  Museum
-                </Label>
-                <Input
-                  id="museum"
-                  value={updatedImage.museum || ""}
-                  onChange={(e) => setUpdatedImage({ ...updatedImage, museum: e.target.value })}
-                  className="col-span-3"
-                />
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="tags" className="text-right">
-                  Tags
-                </Label>
-                <Input
-                  id="tags"
-                  value={updatedImage.tags?.join(", ") || ""}
-                  onChange={(e) => setUpdatedImage({ ...updatedImage, tags: e.target.value.split(", ") })}
-                  className="col-span-3"
-                />
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="orientation" className="text-right">
-                  Orientation
-                </Label>
-                <select
-                  id="orientation"
-                  value={updatedImage.orientation || ""}
-                  onChange={(e) =>
-                    setUpdatedImage({
-                      ...updatedImage,
-                      orientation: e.target.value as "horizontal" | "vertical" | "other",
-                    })
-                  }
-                  className="col-span-3"
-                >
-                  <option value="horizontal">Horizontal</option>
-                  <option value="vertical">Vertical</option>
-                  <option value="other">Other</option>
-                </select>
+              <div className="grid gap-4">
+                <div>
+                  <Label htmlFor="title">Title</Label>
+                  <Input
+                    id="title"
+                    value={updatedImage.title || ""}
+                    onChange={(e) => setUpdatedImage({ ...updatedImage, title: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="artist">Artist</Label>
+                  <Input
+                    id="artist"
+                    value={updatedImage.artist || ""}
+                    onChange={(e) => setUpdatedImage({ ...updatedImage, artist: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="museum">Museum</Label>
+                  <Input
+                    id="museum"
+                    value={updatedImage.museum || ""}
+                    onChange={(e) => setUpdatedImage({ ...updatedImage, museum: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="tags">Tags (comma separated)</Label>
+                  <Input
+                    id="tags"
+                    value={updatedImage.tags?.join(", ") || ""}
+                    onChange={(e) => setUpdatedImage({ ...updatedImage, tags: e.target.value.split(", ").map(tag => tag.trim()) })}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="orientation">Orientation</Label>
+                  <select
+                    id="orientation"
+                    value={updatedImage.orientation || ""}
+                    onChange={(e) =>
+                      setUpdatedImage({
+                        ...updatedImage,
+                        orientation: e.target.value as "horizontal" | "vertical" | "other",
+                      })
+                    }
+                    className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors"
+                  >
+                    <option value="horizontal">Horizontal</option>
+                    <option value="vertical">Vertical</option>
+                    <option value="other">Other</option>
+                  </select>
+                </div>
+                <div>
+                  <Label htmlFor="is_processing">Processing Status</Label>
+                  <select
+                    id="is_processing"
+                    value={updatedImage.is_processing ? "true" : "false"}
+                    onChange={(e) =>
+                      setUpdatedImage({
+                        ...updatedImage,
+                        is_processing: e.target.value === "true",
+                      })
+                    }
+                    className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors"
+                  >
+                    <option value="false">Not Processing</option>
+                    <option value="true">Processing</option>
+                  </select>
+                </div>
+                <div>
+                  <Label htmlFor="processor_id">Processor ID</Label>
+                  <Input
+                    id="processor_id"
+                    type="number"
+                    value={updatedImage.processor_id || ""}
+                    onChange={(e) => setUpdatedImage({ ...updatedImage, processor_id: parseInt(e.target.value) || undefined })}
+                  />
+                </div>
               </div>
             </div>
             <div className="flex justify-end">
