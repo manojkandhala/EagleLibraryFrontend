@@ -47,6 +47,7 @@ export default function AdminGallery() {
   const [sortBy, setSortBy] = useState<"created_at" | "title" | "artist">("created_at")
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc")
   const [isUpdating, setIsUpdating] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
   
   const { ref, inView } = useInView({
     threshold: 0,
@@ -113,6 +114,7 @@ export default function AdminGallery() {
     e.preventDefault()
     if (!selectedImage) return
 
+    setIsSubmitting(true)
     try {
       // Find which field was changed
       const changedField = Object.entries(updatedImage).find(([key, value]) => 
@@ -121,6 +123,7 @@ export default function AdminGallery() {
 
       if (!changedField) {
         setIsUpdateImageOpen(false)
+        setIsSubmitting(false)
         return
       }
 
@@ -166,6 +169,8 @@ export default function AdminGallery() {
       if (error instanceof Error) {
         alert(error.message)
       }
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
@@ -415,7 +420,16 @@ export default function AdminGallery() {
                 placeholder="Enter processor ID"
               />
             </div>
-            <Button type="submit">Save Changes</Button>
+            <Button type="submit" disabled={isSubmitting}>
+              {isSubmitting ? (
+                <>
+                  <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-background border-r-transparent" />
+                  Updating...
+                </>
+              ) : (
+                'Save Changes'
+              )}
+            </Button>
           </form>
         </DialogContent>
       </Dialog>
