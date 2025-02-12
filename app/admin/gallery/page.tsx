@@ -46,6 +46,7 @@ export default function AdminGallery() {
   const [museum, setMuseum] = useState("")
   const [sortBy, setSortBy] = useState<"created_at" | "title" | "artist">("created_at")
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc")
+  const [isUpdating, setIsUpdating] = useState(false)
   
   const { ref, inView } = useInView({
     threshold: 0,
@@ -78,25 +79,29 @@ export default function AdminGallery() {
     if (!data?.items) return
 
     setAllImages(prev => {
-      if (page === 1) return data.items
+      if (page === 1 || isUpdating) return data.items
       // Prevent duplicate images
       const newImages = data.items.filter(
         (newImg: ImageObject) => !prev.some((existingImg: ImageObject) => existingImg.id === newImg.id)
       )
       return [...prev, ...newImages]
     })
-  }, [data, page])
+
+    if (isUpdating) {
+      setIsUpdating(false)
+    }
+  }, [data, page, isUpdating])
 
   // Load more when scrolling
   useEffect(() => {
-    if (!inView || !hasMore || isLoading || (page === 1 && !data)) return
+    if (!inView || !hasMore || isLoading || isUpdating || (page === 1 && !data)) return
 
     const timer = setTimeout(() => {
       setPage(p => p + 1)
     }, 100)
 
     return () => clearTimeout(timer)
-  }, [inView, hasMore, isLoading, page, data])
+  }, [inView, hasMore, isLoading, page, data, isUpdating])
 
   // Reset page and images when filters change
   const handleFilterChange = useCallback(() => {
@@ -109,24 +114,58 @@ export default function AdminGallery() {
     if (!selectedImage) return
 
     try {
+      // Find which field was changed
+      const changedField = Object.entries(updatedImage).find(([key, value]) => 
+        value !== selectedImage[key as keyof ImageObject]
+      )
+
+      if (!changedField) {
+        setIsUpdateImageOpen(false)
+        return
+      }
+
+      // Only send the changed field
+      const [fieldName, newValue] = changedField
+      const updatePayload = {
+        [fieldName]: newValue
+      }
+
+      console.log('Sending update:', updatePayload)
+
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/images/${selectedImage.id}`, {
         method: "PUT",
         headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-          "Content-Type": "application/json",
+          "accept": "application/json",
+          "Authorization": `Bearer ${localStorage.getItem("token")}`,
+          "Content-Type": "application/json"
         },
-        body: JSON.stringify(updatedImage),
+        body: JSON.stringify(updatePayload)
       })
-      if (response.ok) {
-        setIsUpdateImageOpen(false)
-        setUpdatedImage({})
-        handleFilterChange()
-        refetch()
-      } else {
-        console.error("Failed to update image")
+
+      const responseData = await response.text()
+      console.log('Response:', response.status, responseData)
+
+      if (!response.ok) {
+        const errorData = JSON.parse(responseData)
+        throw new Error(errorData.detail?.[0]?.msg || "Failed to update image")
       }
+
+      // Close dialog and reset state
+      setIsUpdateImageOpen(false)
+      setUpdatedImage({})
+      
+      // Set updating flag and reset page
+      setIsUpdating(true)
+      setAllImages([])
+      setPage(1)
+      
+      // Refetch the data
+      await refetch()
     } catch (error) {
       console.error("Error updating image:", error)
+      if (error instanceof Error) {
+        alert(error.message)
+      }
     }
   }
 
@@ -250,7 +289,16 @@ export default function AdminGallery() {
                 <Button
                   onClick={() => {
                     setSelectedImage(image)
-                    setUpdatedImage(image)
+                    // Initialize all editable fields
+                    setUpdatedImage({
+                      title: image.title,
+                      artist: image.artist,
+                      museum: image.museum || "",
+                      tags: image.tags || [],
+                      orientation: image.orientation,
+                      is_processing: image.is_processing,
+                      processor_id: image.processor_id
+                    })
                     setIsUpdateImageOpen(true)
                   }}
                   variant="outline"
@@ -308,6 +356,63 @@ export default function AdminGallery() {
                 id="museum"
                 value={updatedImage.museum || ""}
                 onChange={(e) => setUpdatedImage(prev => ({ ...prev, museum: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="tags">Tags (comma-separated)</Label>
+              <Input
+                id="tags"
+                value={updatedImage.tags?.join(", ") || ""}
+                onChange={(e) => setUpdatedImage(prev => ({ 
+                  ...prev, 
+                  tags: e.target.value.split(",").map(tag => tag.trim()).filter(Boolean)
+                }))}
+                placeholder="tag1, tag2, tag3"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="orientation">Orientation</Label>
+              <select
+                id="orientation"
+                value={updatedImage.orientation || ""}
+                onChange={(e) => setUpdatedImage(prev => ({ 
+                  ...prev, 
+                  orientation: e.target.value as "horizontal" | "vertical" | "other"
+                }))}
+                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
+              >
+                <option value="horizontal">Horizontal</option>
+                <option value="vertical">Vertical</option>
+                <option value="other">Other</option>
+              </select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="is_processing">Processing Status</Label>
+              <div className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  id="is_processing"
+                  checked={updatedImage.is_processing || false}
+                  onChange={(e) => setUpdatedImage(prev => ({ 
+                    ...prev, 
+                    is_processing: e.target.checked
+                  }))}
+                  className="h-4 w-4 rounded border-gray-300"
+                />
+                <Label htmlFor="is_processing">Is Processing</Label>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="processor_id">Processor ID</Label>
+              <Input
+                id="processor_id"
+                type="number"
+                value={updatedImage.processor_id || ""}
+                onChange={(e) => setUpdatedImage(prev => ({ 
+                  ...prev, 
+                  processor_id: e.target.value ? parseInt(e.target.value) : undefined
+                }))}
+                placeholder="Enter processor ID"
               />
             </div>
             <Button type="submit">Save Changes</Button>

@@ -76,19 +76,43 @@ export default function ImageDetailsPage() {
     e.preventDefault()
     setIsUpdating(true)
     try {
+      // Find which fields have changed
+      const changedFields = Object.entries(updatedImage).reduce((acc, [key, value]) => {
+        if (image && value !== image[key as keyof ImageObject]) {
+          acc[key] = value
+        }
+        return acc
+      }, {} as Record<string, any>)
+
+      // Don't send request if no fields changed
+      if (Object.keys(changedFields).length === 0) {
+        setIsUpdating(false)
+        return
+      }
+
+      console.log('Sending update:', changedFields)
+
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/images/${id}`, {
         method: "PUT",
         headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
+          "accept": "application/json",
+          "Authorization": `Bearer ${localStorage.getItem("token")}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(updatedImage),
+        body: JSON.stringify(changedFields),
       })
-      if (!response.ok) throw new Error("Failed to update image")
+
+      const responseData = await response.text()
+      console.log('Response:', response.status, responseData)
+
+      if (!response.ok) {
+        const errorData = JSON.parse(responseData)
+        throw new Error(errorData.detail?.[0]?.msg || "Failed to update image")
+      }
       
       await fetchImageDetails()
     } catch (err) {
-      setError("Error updating image. Please try again.")
+      setError(err instanceof Error ? err.message : "Error updating image. Please try again.")
       console.error("Error updating image:", err)
     } finally {
       setIsUpdating(false)

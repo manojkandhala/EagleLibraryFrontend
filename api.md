@@ -311,23 +311,79 @@ Response: Same as /users/available-images
 ```http
 PUT /images/{image_id}
 Authorization: Bearer <token>
+Content-Type: application/json
+
+Purpose: Modify image metadata and status
+Usage: Image management, assignment control
+Note: Can reassign processors and update status
 
 URL Parameters:
-- image_id: integer
+- image_id: integer (required)
 
-Body (all fields optional):
+Request Body Schema:
 {
+  "title": string (optional),
+  "artist": string (optional),
+  "museum": string (optional),
+  "tags": array[string] (optional),     // Array of string tags
+  "orientation": string (optional),      // Must be "horizontal", "vertical", or "other"
+  "is_processing": boolean (optional),
+  "processor_id": integer (optional)     // ID of user to assign processing
+}
+
+Example Request:
+{
+  "artist": "Vincent van Gogh",
+  "title": "The Starry Night",
+  "tags": ["post-impressionism", "night", "stars"],
+  "museum": "MoMA"
+}
+
+Response: 200 OK
+{
+  "id": integer,
   "title": string,
   "artist": string,
   "museum": string,
-  "tags": string,
-  "orientation": "horizontal" | "vertical" | "other",
+  "tags": array[string],
+  "orientation": string,
+  "created_at": string (ISO 8601),
+  "updated_at": string (ISO 8601),
   "is_processing": boolean,
-  "processor_id": integer
+  "processor_id": integer | null,
+  "urls": {
+    "original": string,
+    "processed": string | null,
+    "thumbnails": {
+      "small": string,
+      "medium": string,
+      "large": string,
+      "xlarge": string
+    }
+  }
 }
 
-Response: ImageObject
+Errors:
+- 401: {"detail": "Could not validate credentials"}
+- 403: {"detail": "User does not have admin privileges"}
+- 404: {"detail": "Image not found"}
+- 422: {
+    "detail": [{
+      "loc": ["body", "field_name"],
+      "msg": "Error description",
+      "type": "validation_error"
+    }]
+  }
 ```
+
+Important Notes for AI Agents:
+1. All request body fields are optional - only include fields you want to update
+2. Tags must be provided as an array of strings, not comma-separated string
+3. Orientation must be one of: "horizontal", "vertical", "other"
+4. The response includes the complete updated image object with all fields
+5. URLs in the response are pre-signed S3 URLs valid for 1 hour
+6. Request must include valid admin Bearer token in Authorization header
+7. Content-Type must be application/json
 
 ## Admin-Only Image Endpoints
 
@@ -395,38 +451,7 @@ Errors:
 - 403: Not admin user
 ```
 
-3. Update Image (Admin Only)
-```http
-PUT /images/{image_id}
-Authorization: Bearer <token>
-
-Purpose: Modify image metadata and status
-Usage: Image management, assignment control
-Note: Can reassign processors and update status
-
-URL Parameters:
-- image_id: integer
-
-Request Body (all fields optional):
-{
-  "title": string,
-  "artist": string,
-  "museum": string,
-  "tags": string,
-  "orientation": "horizontal" | "vertical" | "other",
-  "is_processing": boolean,
-  "processor_id": integer     // Assign to specific user
-}
-
-Response: SingleImageResponse
-
-Errors:
-- 404: Image not found
-- 403: Not admin user
-- 422: Invalid input data
-```
-
-4. Delete Image (Admin Only)
+3. Delete Image (Admin Only)
 ```http
 DELETE /images/{image_id}
 Authorization: Bearer <token>
