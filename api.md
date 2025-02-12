@@ -311,44 +311,44 @@ Response: Same as /users/available-images
 ```http
 PUT /images/{image_id}
 Authorization: Bearer <token>
-Content-Type: application/json
 
-Purpose: Modify image metadata and status
-Usage: Image management, assignment control
-Note: Can reassign processors and update status
+Purpose: Modify image metadata and processing status
+Usage: Image management, control processing assignments
 
 URL Parameters:
-- image_id: integer (required)
+- image_id: integer
 
-Request Body Schema:
+Request Body (all fields optional):
 {
-  "title": string (optional),
-  "artist": string (optional),
-  "museum": string (optional),
-  "tags": array[string] (optional),     // Array of string tags
-  "orientation": string (optional),      // Must be "horizontal", "vertical", or "other"
-  "is_processing": boolean (optional),
-  "processor_id": integer (optional)     // ID of user to assign processing
+  "title": string,
+  "artist": string,
+  "museum": string,
+  "tags": string,
+  "orientation": "horizontal" | "vertical" | "other",
+  "is_processing": boolean,
+  "processor_id": integer | null | ""  // Can be integer, null, or empty string
 }
 
-Example Request:
-{
-  "artist": "Vincent van Gogh",
-  "title": "The Starry Night",
-  "tags": ["post-impressionism", "night", "stars"],
-  "museum": "MoMA"
-}
+Notes:
+- Setting both is_processing=false and processor_id=null will:
+  - Remove the image from processing
+  - Delete the associated ImageProcessing record
+  - Make the image available for processing again
+- processor_id accepts:
+  - Integer: Assign to specific processor
+  - null: Remove processor assignment
+  - Empty string ("" or " "): Remove processor assignment
 
-Response: 200 OK
+Response: SingleImageResponse
 {
   "id": integer,
   "title": string,
   "artist": string,
   "museum": string,
-  "tags": array[string],
+  "tags": string[],
   "orientation": string,
-  "created_at": string (ISO 8601),
-  "updated_at": string (ISO 8601),
+  "created_at": string,
+  "updated_at": string,
   "is_processing": boolean,
   "processor_id": integer | null,
   "urls": {
@@ -363,27 +363,43 @@ Response: 200 OK
   }
 }
 
-Errors:
-- 401: {"detail": "Could not validate credentials"}
-- 403: {"detail": "User does not have admin privileges"}
-- 404: {"detail": "Image not found"}
-- 422: {
-    "detail": [{
-      "loc": ["body", "field_name"],
-      "msg": "Error description",
-      "type": "validation_error"
-    }]
-  }
-```
+Example Request:
+{
+  "is_processing": false,
+  "processor_id": null
+}
 
-Important Notes for AI Agents:
-1. All request body fields are optional - only include fields you want to update
-2. Tags must be provided as an array of strings, not comma-separated string
-3. Orientation must be one of: "horizontal", "vertical", "other"
-4. The response includes the complete updated image object with all fields
-5. URLs in the response are pre-signed S3 URLs valid for 1 hour
-6. Request must include valid admin Bearer token in Authorization header
-7. Content-Type must be application/json
+Example Response:
+{
+  "id": 5366,
+  "title": "Sisters",
+  "artist": "unknown",
+  "museum": "Met Museum",
+  "tags": ["woman", "jewelry", "dress", "portrait"],
+  "orientation": "vertical",
+  "created_at": "2025-01-30T01:36:35",
+  "updated_at": "2025-02-12T17:32:29",
+  "is_processing": false,
+  "processor_id": null,
+  "urls": {
+    "original": "https://...",
+    "processed": null,
+    "thumbnails": {
+      "small": "https://...",
+      "medium": "https://...",
+      "large": "https://...",
+      "xlarge": "https://..."
+    }
+  }
+}
+
+Errors:
+- 401: Unauthorized
+- 403: Not admin user
+- 404: Image not found
+- 422: Invalid input data
+- 500: Database error
+```
 
 ## Admin-Only Image Endpoints
 
@@ -474,7 +490,7 @@ Errors:
 - 500: S3 deletion error
 ```
 
-5. System Overview (Admin Only)
+4. System Overview (Admin Only)
 ```http
 GET /admin/processing-overview
 Authorization: Bearer <token>

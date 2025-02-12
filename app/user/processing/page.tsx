@@ -1,28 +1,88 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useCallback } from "react"
 import { useUserProcessing } from "@/hooks/useQueries"
-import { useRouter } from "next/navigation"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { AlertCircle, ArrowUpRight, ImageIcon, Loader2, RefreshCcw } from "lucide-react"
+import { AlertCircle, Download, ImageIcon, Loader2, Upload } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 interface ProcessingImage {
   id: number
   title: string
-  status: string
-  preview_url: string | null
+  artist: string
+  museum?: string
+  tags: string[]
+  orientation: "horizontal" | "vertical" | "other"
   created_at: string
   updated_at: string
+  urls: {
+    original: string
+    processed?: string
+    thumbnails: {
+      small: string
+      medium: string
+      large: string
+      xlarge: string
+    }
+  }
+  is_processing: boolean
+  processor_id?: number
 }
 
 export default function ProcessingPage() {
-  const router = useRouter()
-  const [selectedImage, setSelectedImage] = useState<ProcessingImage | null>(null)
-  const { data, isLoading, error, refetch, isRefetching } = useUserProcessing()
+  const [uploadingId, setUploadingId] = useState<number | null>(null)
+  const { data, isLoading, error, refetch } = useUserProcessing()
+
+  const handleDownload = (imageUrl: string, imageId: number) => {
+    const downloadLink = document.createElement('a')
+    downloadLink.href = imageUrl
+    downloadLink.download = `image-${imageId}`
+    downloadLink.click()
+  }
+
+  const handleUpload = async (imageId: number) => {
+    setUploadingId(imageId)
+    try {
+      // Create file input and trigger click
+      const fileInput = document.createElement('input')
+      fileInput.type = 'file'
+      fileInput.accept = 'image/*'
+      fileInput.onchange = async (e) => {
+        const file = (e.target as HTMLInputElement).files?.[0]
+        if (!file) return
+
+        const formData = new FormData()
+        formData.append('file', file)
+
+        const response = await fetch(
+          `${process.env.NEXT_PUBLIC_API_URL}/images/${imageId}/upload-processed`,
+          {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${localStorage.getItem("token")}`,
+            },
+            body: formData,
+          }
+        )
+
+        if (!response.ok) {
+          const errorData = await response.json()
+          throw new Error(errorData.detail || "Failed to upload processed image")
+        }
+
+        // Refetch to update the list
+        refetch()
+      }
+      fileInput.click()
+    } catch (err) {
+      console.error("Error uploading processed image:", err)
+      alert(err instanceof Error ? err.message : "Failed to upload processed image")
+    } finally {
+      setUploadingId(null)
+    }
+  }
 
   if (isLoading) {
     return (
@@ -38,38 +98,17 @@ export default function ProcessingPage() {
     <div className="max-w-7xl mx-auto space-y-8">
       <div className="flex flex-col space-y-4 md:flex-row md:justify-between md:items-center md:space-y-0">
         <div className="space-y-1">
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-primary via-primary/80 to-primary bg-clip-text text-transparent animate-gradient">
+          <h1 className="text-3xl font-bold bg-gradient-to-r from-primary via-primary/80 to-primary bg-clip-text text-transparent">
             Processing Images
           </h1>
           <p className="text-muted-foreground text-sm">
-            Monitor and manage your image processing queue
+            Manage your assigned images for processing
           </p>
-        </div>
-        <div className="flex items-center gap-3">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => refetch()}
-            disabled={isRefetching}
-            className="gap-2 transition-all hover:shadow-md"
-          >
-            <RefreshCcw className={cn("h-4 w-4", isRefetching && "animate-spin")} />
-            Refresh
-          </Button>
-          <Button
-            variant="default"
-            size="sm"
-            onClick={() => router.push("/user/gallery")}
-            className="gap-2 transition-all hover:shadow-md"
-          >
-            <ArrowUpRight className="h-4 w-4" />
-            Go to Gallery
-          </Button>
         </div>
       </div>
 
       {error && (
-        <div className="bg-destructive/15 text-destructive px-4 py-3 rounded-lg flex items-center gap-2 animate-in slide-in-from-top-2 duration-200">
+        <div className="bg-destructive/15 text-destructive px-4 py-3 rounded-lg flex items-center gap-2">
           <AlertCircle className="h-4 w-4" />
           <span>Error loading processing images. Please try again.</span>
         </div>
@@ -82,109 +121,80 @@ export default function ProcessingPage() {
               <ImageIcon className="h-6 w-6 text-primary" />
             </div>
             <CardTitle className="text-xl font-semibold mb-2">No Processing Images</CardTitle>
-            <CardDescription className="max-w-sm mb-4">
-              You don't have any images being processed at the moment. Visit your gallery to start processing new images.
+            <CardDescription className="max-w-sm">
+              You don't have any images assigned for processing at the moment.
             </CardDescription>
-            <Button
-              variant="default"
-              onClick={() => router.push("/user/gallery")}
-              className="gap-2"
-            >
-              <ArrowUpRight className="h-4 w-4" />
-              Go to Gallery
-            </Button>
           </CardContent>
         </Card>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="space-y-4">
           {images.map((image: ProcessingImage) => (
-            <Card
-              key={image.id}
-              className="group hover:shadow-xl transition-all duration-300 hover:-translate-y-1 cursor-pointer"
-              onClick={() => setSelectedImage(image)}
-            >
-              <CardHeader className="pb-0">
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-lg font-semibold truncate group-hover:text-primary transition-colors">
-                    {image.title}
-                  </CardTitle>
-                  <div className={cn(
-                    "px-2 py-1 rounded-full text-xs capitalize transition-colors",
-                    image.status === "processing" 
-                      ? "bg-amber-100 text-amber-700 group-hover:bg-amber-200"
-                      : image.status === "completed"
-                      ? "bg-green-100 text-green-700 group-hover:bg-green-200"
-                      : "bg-slate-100 text-slate-700 group-hover:bg-slate-200"
-                  )}>
-                    {image.status}
-                  </div>
-                </div>
-                <CardDescription className="text-sm text-muted-foreground mt-1">
-                  Started {new Date(image.created_at).toLocaleString()}
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="pt-4">
-                {image.preview_url ? (
-                  <div className="relative aspect-video rounded-lg overflow-hidden bg-muted">
+            <Card key={image.id} className="overflow-hidden">
+              <CardContent className="p-6">
+                <div className="flex flex-col md:flex-row gap-6">
+                  <div className="relative aspect-video w-full md:w-1/3">
                     <Image
-                      src={image.preview_url}
+                      src={image.urls.thumbnails.medium}
                       alt={image.title}
                       fill
-                      className="object-cover transition-transform group-hover:scale-105"
+                      className="object-cover rounded-lg"
+                      sizes="(max-width: 768px) 100vw, 33vw"
                     />
                   </div>
-                ) : (
-                  <div className="flex items-center justify-center aspect-video rounded-lg bg-muted/50">
-                    <Loader2 className="h-8 w-8 text-muted-foreground animate-spin" />
+                  <div className="flex-1 space-y-4">
+                    <div>
+                      <h2 className="text-xl font-semibold">{image.title}</h2>
+                      <p className="text-muted-foreground">
+                        by {image.artist}
+                        {image.museum && ` • ${image.museum}`}
+                      </p>
+                    </div>
+                    {image.tags && image.tags.length > 0 && (
+                      <div className="flex flex-wrap gap-2">
+                        {image.tags.map((tag, index) => (
+                          <span
+                            key={index}
+                            className="px-2 py-1 bg-secondary text-secondary-foreground rounded-full text-xs"
+                          >
+                            {tag}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    <div className="flex gap-4">
+                      <Button
+                        onClick={() => handleDownload(image.urls.original, image.id)}
+                        variant="outline"
+                        className="gap-2"
+                      >
+                        <Download className="h-4 w-4" />
+                        Download Original
+                      </Button>
+                      <Button
+                        onClick={() => handleUpload(image.id)}
+                        disabled={uploadingId === image.id}
+                        className="gap-2"
+                      >
+                        {uploadingId === image.id ? (
+                          <>
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                            Uploading...
+                          </>
+                        ) : (
+                          <>
+                            <Upload className="h-4 w-4" />
+                            Upload Processed
+                          </>
+                        )}
+                      </Button>
+                    </div>
                   </div>
-                )}
+                </div>
               </CardContent>
             </Card>
           ))}
         </div>
       )}
-
-      <Dialog open={!!selectedImage} onOpenChange={() => setSelectedImage(null)}>
-        <DialogContent className="max-w-3xl">
-          <DialogHeader>
-            <DialogTitle className="flex items-center justify-between">
-              <span>{selectedImage?.title}</span>
-              <span className={cn(
-                "px-2 py-1 rounded-full text-xs capitalize",
-                selectedImage?.status === "processing" 
-                  ? "bg-amber-100 text-amber-700"
-                  : selectedImage?.status === "completed"
-                  ? "bg-green-100 text-green-700"
-                  : "bg-slate-100 text-slate-700"
-              )}>
-                {selectedImage?.status}
-              </span>
-            </DialogTitle>
-          </DialogHeader>
-          {selectedImage?.preview_url ? (
-            <div className="relative aspect-video rounded-lg overflow-hidden bg-muted">
-              <Image
-                src={selectedImage.preview_url}
-                alt={selectedImage.title}
-                fill
-                className="object-contain"
-              />
-            </div>
-          ) : (
-            <div className="flex items-center justify-center aspect-video rounded-lg bg-muted">
-              <Loader2 className="h-8 w-8 text-muted-foreground animate-spin" />
-            </div>
-          )}
-          <div className="grid grid-cols-2 gap-4 text-sm text-muted-foreground">
-            <div>
-              <strong>Started:</strong> {new Date(selectedImage?.created_at || "").toLocaleString()}
-            </div>
-            <div>
-              <strong>Last Updated:</strong> {new Date(selectedImage?.updated_at || "").toLocaleString()}
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   )
 }

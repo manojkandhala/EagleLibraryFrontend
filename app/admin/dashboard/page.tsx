@@ -266,13 +266,13 @@ export default function AdminDashboard() {
                         <TableCell>
                           <span className={cn(
                             "px-2 py-1 rounded-full text-xs capitalize transition-colors",
-                            activity.action.includes("start") 
+                            activity.action?.includes("start") 
                               ? "bg-amber-100 text-amber-700 group-hover:bg-amber-200"
-                              : activity.action.includes("complete")
+                              : activity.action?.includes("complete")
                               ? "bg-green-100 text-green-700 group-hover:bg-green-200"
                               : "bg-slate-100 text-slate-700 group-hover:bg-slate-200"
                           )}>
-                            {activity.action}
+                            {activity.action || "Unknown"}
                           </span>
                         </TableCell>
                         <TableCell className="text-sm text-muted-foreground">
