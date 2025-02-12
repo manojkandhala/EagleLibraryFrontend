@@ -13,6 +13,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { User } from "lucide-react"
 
 interface UserProfile {
   id: number
@@ -21,7 +22,7 @@ interface UserProfile {
   role: string
 }
 
-export default function AdminLayout({
+export default function UserLayout({
   children,
 }: {
   children: React.ReactNode
@@ -72,15 +73,15 @@ export default function AdminLayout({
   const navItems = [
     {
       name: "Dashboard",
-      href: "/admin/dashboard",
-    },
-    {
-      name: "Users",
-      href: "/admin/users",
+      href: "/user/dashboard",
     },
     {
       name: "Gallery",
-      href: "/admin/gallery",
+      href: "/user/gallery",
+    },
+    {
+      name: "Processing",
+      href: "/user/processing",
     },
   ]
 
@@ -96,7 +97,7 @@ export default function AdminLayout({
     <div className="min-h-screen">
       <header className="border-b bg-background">
         <div className="px-6 h-14 flex items-center">
-          <Link href="/admin/dashboard" className="font-semibold text-lg">
+          <Link href="/user/dashboard" className="font-semibold text-lg">
             Eagle Library
           </Link>
           <nav className="flex items-center gap-6 ml-6">
@@ -132,7 +133,7 @@ export default function AdminLayout({
                   </div>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem asChild>
-                    <Link href="/admin/change-password" className="w-full cursor-pointer">
+                    <Link href="/user/change-password" className="w-full cursor-pointer">
                       Change Password
                     </Link>
                   </DropdownMenuItem>
@@ -150,5 +151,4 @@ export default function AdminLayout({
       </main>
     </div>
   )
-}
-
+} 
