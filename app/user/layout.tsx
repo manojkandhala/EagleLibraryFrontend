@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { User } from "lucide-react"
+import { useCurrentUser } from "@/hooks/useQueries"
 
 interface UserProfile {
   id: number
@@ -29,27 +30,7 @@ export default function UserLayout({
 }) {
   const pathname = usePathname()
   const router = useRouter()
-  const [user, setUser] = useState<UserProfile | null>(null)
-
-  useEffect(() => {
-    fetchUserProfile()
-  }, [])
-
-  const fetchUserProfile = async () => {
-    try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/users/me`, {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-        },
-      })
-      if (response.ok) {
-        const data = await response.json()
-        setUser(data)
-      }
-    } catch (error) {
-      console.error("Error fetching user profile:", error)
-    }
-  }
+  const { data: user } = useCurrentUser()
 
   const handleLogout = async () => {
     try {

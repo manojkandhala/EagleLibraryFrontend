@@ -1,6 +1,7 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect } from "react"
+import { useAdminGallery } from "@/hooks/useQueries"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -40,9 +41,6 @@ export default function AdminGallery() {
   const [isUpdateImageOpen, setIsUpdateImageOpen] = useState(false)
   const [updatedImage, setUpdatedImage] = useState<Partial<ImageObject>>({})
   const [page, setPage] = useState(1)
-  const [loading, setLoading] = useState(false)
-  const [hasMore, setHasMore] = useState(true)
-  const [error, setError] = useState("")
   const [searchTerm, setSearchTerm] = useState("")
   const [orientation, setOrientation] = useState<"" | "horizontal" | "vertical" | "other">("")
   const [museum, setMuseum] = useState("")
@@ -54,61 +52,42 @@ export default function AdminGallery() {
     rootMargin: "100px",
   })
 
-  const fetchImages = useCallback(async () => {
-    if (loading || !hasMore) return
+  const params = new URLSearchParams({
+    page: page.toString(),
+    page_size: "12",
+    sort_by: sortBy,
+    sort_order: sortOrder,
+  })
 
-    setLoading(true)
-    try {
-      const params = new URLSearchParams({
-        page: page.toString(),
-        page_size: "12",
-        sort_by: sortBy,
-        sort_order: sortOrder,
-      })
+  if (searchTerm) params.append("search_term", searchTerm)
+  if (orientation) params.append("orientation", orientation)
+  if (museum) params.append("museum", museum)
 
-      if (searchTerm) params.append("search_term", searchTerm)
-      if (orientation) params.append("orientation", orientation)
-      if (museum) params.append("museum", museum)
+  const { data, isLoading, error, refetch } = useAdminGallery(params)
 
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/images?${params.toString()}`,
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
-        }
-      )
-      if (!response.ok) throw new Error("Failed to fetch images")
-      
-      const data = await response.json()
+  // Update images when data changes
+  useEffect(() => {
+    if (data?.items) {
       if (page === 1) {
         setImages(data.items)
       } else {
         setImages((prev) => [...prev, ...data.items])
       }
-      setHasMore(data.has_next)
-      setPage((p) => p + 1)
-      setError("")
-    } catch (err) {
-      setError("Error loading images. Please try again.")
-      console.error("Error fetching images:", err)
-    } finally {
-      setLoading(false)
     }
-  }, [page, loading, hasMore, searchTerm, orientation, museum, sortBy, sortOrder])
+  }, [data, page])
 
+  // Load more when scrolling
+  useEffect(() => {
+    if (inView && data?.has_next && !isLoading) {
+      setPage((p) => p + 1)
+    }
+  }, [inView, data?.has_next, isLoading])
+
+  // Reset page when filters change
   useEffect(() => {
     setPage(1)
     setImages([])
-    setHasMore(true)
-    fetchImages()
   }, [searchTerm, orientation, museum, sortBy, sortOrder])
-
-  useEffect(() => {
-    if (inView && page > 1) {
-      fetchImages()
-    }
-  }, [inView, fetchImages])
 
   const handleUpdateImage = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -128,8 +107,7 @@ export default function AdminGallery() {
         setUpdatedImage({})
         setPage(1)
         setImages([])
-        setHasMore(true)
-        fetchImages()
+        refetch()
       } else {
         console.error("Failed to update image")
       }
@@ -152,9 +130,16 @@ export default function AdminGallery() {
       
       setImages((prev) => prev.filter((img) => img.id !== imageId))
     } catch (err) {
-      setError("Error deleting image. Please try again.")
       console.error("Error deleting image:", err)
     }
+  }
+
+  if (isLoading && page === 1) {
+    return (
+      <div className="flex justify-center items-center min-h-[400px]">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    )
   }
 
   return (
@@ -165,7 +150,7 @@ export default function AdminGallery() {
       
       {error && (
         <div className="bg-destructive/15 text-destructive px-4 py-2 rounded-md">
-          {error}
+          Error loading images. Please try again.
         </div>
       )}
 
@@ -249,15 +234,13 @@ export default function AdminGallery() {
                   }}
                   variant="outline"
                   size="sm"
-                  className="flex-1"
                 >
-                  Quick Update
+                  Edit
                 </Button>
-                <Button 
-                  onClick={() => handleDeleteImage(image.id)} 
-                  variant="destructive" 
+                <Button
+                  onClick={() => handleDeleteImage(image.id)}
+                  variant="destructive"
                   size="sm"
-                  className="flex-1"
                 >
                   Delete
                 </Button>
@@ -265,11 +248,9 @@ export default function AdminGallery() {
             </CardContent>
           </Card>
         ))}
-      </div>
-      
-      <div ref={ref} className="h-10">
-        {loading && (
-          <div className="flex justify-center">
+        {/* Infinite scroll trigger */}
+        {data?.has_next && (
+          <div ref={ref} className="col-span-full flex justify-center p-4">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
           </div>
         )}
@@ -278,92 +259,34 @@ export default function AdminGallery() {
       <Dialog open={isUpdateImageOpen} onOpenChange={setIsUpdateImageOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Update Image</DialogTitle>
+            <DialogTitle>Edit Image</DialogTitle>
           </DialogHeader>
-          <form onSubmit={handleUpdateImage}>
-            <div className="grid gap-4 py-4">
-              <div className="grid gap-4">
-                <div>
-                  <Label htmlFor="title">Title</Label>
-                  <Input
-                    id="title"
-                    value={updatedImage.title || ""}
-                    onChange={(e) => setUpdatedImage({ ...updatedImage, title: e.target.value })}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="artist">Artist</Label>
-                  <Input
-                    id="artist"
-                    value={updatedImage.artist || ""}
-                    onChange={(e) => setUpdatedImage({ ...updatedImage, artist: e.target.value })}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="museum">Museum</Label>
-                  <Input
-                    id="museum"
-                    value={updatedImage.museum || ""}
-                    onChange={(e) => setUpdatedImage({ ...updatedImage, museum: e.target.value })}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="tags">Tags (comma separated)</Label>
-                  <Input
-                    id="tags"
-                    value={updatedImage.tags?.join(", ") || ""}
-                    onChange={(e) => setUpdatedImage({ ...updatedImage, tags: e.target.value.split(", ").map(tag => tag.trim()) })}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="orientation">Orientation</Label>
-                  <select
-                    id="orientation"
-                    value={updatedImage.orientation || ""}
-                    onChange={(e) =>
-                      setUpdatedImage({
-                        ...updatedImage,
-                        orientation: e.target.value as "horizontal" | "vertical" | "other",
-                      })
-                    }
-                    className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors"
-                  >
-                    <option value="horizontal">Horizontal</option>
-                    <option value="vertical">Vertical</option>
-                    <option value="other">Other</option>
-                  </select>
-                </div>
-                <div>
-                  <Label htmlFor="is_processing">Processing Status</Label>
-                  <select
-                    id="is_processing"
-                    value={updatedImage.is_processing ? "true" : "false"}
-                    onChange={(e) =>
-                      setUpdatedImage({
-                        ...updatedImage,
-                        is_processing: e.target.value === "true",
-                      })
-                    }
-                    className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors"
-                  >
-                    <option value="false">Not Processing</option>
-                    <option value="true">Processing</option>
-                  </select>
-                </div>
-                <div>
-                  <Label htmlFor="processor_id">Processor ID</Label>
-                  <Input
-                    id="processor_id"
-                    type="number"
-                    value={updatedImage.processor_id || ""}
-                    onChange={(e) => setUpdatedImage({ ...updatedImage, processor_id: parseInt(e.target.value) || undefined })}
-                  />
-                </div>
-              </div>
+          <form onSubmit={handleUpdateImage} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="title">Title</Label>
+              <Input
+                id="title"
+                value={updatedImage.title || ""}
+                onChange={(e) => setUpdatedImage(prev => ({ ...prev, title: e.target.value }))}
+              />
             </div>
-            <div className="flex justify-end">
-              <Button type="submit">Update Image</Button>
+            <div className="space-y-2">
+              <Label htmlFor="artist">Artist</Label>
+              <Input
+                id="artist"
+                value={updatedImage.artist || ""}
+                onChange={(e) => setUpdatedImage(prev => ({ ...prev, artist: e.target.value }))}
+              />
             </div>
+            <div className="space-y-2">
+              <Label htmlFor="museum">Museum</Label>
+              <Input
+                id="museum"
+                value={updatedImage.museum || ""}
+                onChange={(e) => setUpdatedImage(prev => ({ ...prev, museum: e.target.value }))}
+              />
+            </div>
+            <Button type="submit">Save Changes</Button>
           </form>
         </DialogContent>
       </Dialog>

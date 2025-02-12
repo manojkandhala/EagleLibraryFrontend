@@ -21,6 +21,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Search, SortAsc, SortDesc } from "lucide-react"
+import { useUserGallery } from "@/hooks/useQueries"
 
 interface ImageObject {
   id: number
@@ -40,11 +41,8 @@ interface ImageObject {
 }
 
 export default function UserGallery() {
-  const [images, setImages] = useState<ImageObject[]>([])
   const [page, setPage] = useState(1)
-  const [loading, setLoading] = useState(false)
-  const [hasMore, setHasMore] = useState(true)
-  const [error, setError] = useState("")
+  const [allImages, setAllImages] = useState<ImageObject[]>([])
   const [selectedImage, setSelectedImage] = useState<ImageObject | null>(null)
   
   // Search and filter states
@@ -58,60 +56,49 @@ export default function UserGallery() {
     rootMargin: "100px",
   })
 
-  const fetchImages = useCallback(async () => {
-    if (loading || !hasMore) return
+  // Memoize params creation to prevent unnecessary re-renders
+  const params = useCallback(() => {
+    const p = new URLSearchParams({
+      page: page.toString(),
+      page_size: "12",
+      sort_by: sortBy,
+      sort_order: sortOrder,
+    })
 
-    setLoading(true)
-    try {
-      const params = new URLSearchParams({
-        page: page.toString(),
-        page_size: "12",
-        sort_by: sortBy,
-        sort_order: sortOrder,
-      })
+    if (searchTerm) p.append("search_term", searchTerm)
+    if (orientation && orientation !== "all") p.append("orientation", orientation)
 
-      if (searchTerm) params.append("search_term", searchTerm)
-      if (orientation && orientation !== "all") params.append("orientation", orientation)
+    return p
+  }, [page, sortBy, sortOrder, searchTerm, orientation])
 
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/users/available-images?${params.toString()}`,
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
-        }
+  const { data, isLoading, error, refetch } = useUserGallery(params())
+  const hasMore = data?.has_next || false
+
+  // Update allImages when new data arrives
+  useEffect(() => {
+    if (!data?.items) return
+
+    setAllImages(prev => {
+      if (page === 1) return data.items
+      // Prevent duplicate images
+      const newImages = data.items.filter(
+        (newImg: ImageObject) => !prev.some((existingImg: ImageObject) => existingImg.id === newImg.id)
       )
-      if (!response.ok) throw new Error("Failed to fetch images")
-      
-      const data = await response.json()
-      if (page === 1) {
-        setImages(data.items)
-      } else {
-        setImages((prev) => [...prev, ...data.items])
-      }
-      setHasMore(data.has_next)
-      setPage((p) => p + 1)
-      setError("")
-    } catch (err) {
-      setError("Error loading images. Please try again.")
-      console.error("Error fetching images:", err)
-    } finally {
-      setLoading(false)
-    }
-  }, [page, loading, hasMore, searchTerm, orientation, sortBy, sortOrder])
+      return [...prev, ...newImages]
+    })
+  }, [data, page])
 
+  // Load more when scrolling
   useEffect(() => {
+    if (!inView || !hasMore || isLoading) return
+    setPage(p => p + 1)
+  }, [inView, hasMore, isLoading])
+
+  // Reset page and images when filters change
+  const handleFilterChange = useCallback(() => {
     setPage(1)
-    setImages([])
-    setHasMore(true)
-    fetchImages()
-  }, [searchTerm, orientation, sortBy, sortOrder])
-
-  useEffect(() => {
-    if (inView && page > 1) {
-      fetchImages()
-    }
-  }, [inView, fetchImages])
+    setAllImages([])
+  }, [])
 
   const handleStartProcessing = async (imageId: number) => {
     try {
@@ -126,16 +113,16 @@ export default function UserGallery() {
       )
       if (!response.ok) throw new Error("Failed to start processing")
       
-      // Remove the processed image from the list
-      setImages((prev) => prev.filter((img) => img.id !== imageId))
+      // Refetch the gallery data
+      refetch()
     } catch (err) {
-      setError("Error starting image processing. Please try again.")
       console.error("Error starting processing:", err)
     }
   }
 
   const toggleSortOrder = () => {
     setSortOrder(current => current === "asc" ? "desc" : "asc")
+    handleFilterChange()
   }
 
   return (
@@ -143,9 +130,9 @@ export default function UserGallery() {
       <div className="flex flex-col gap-4">
         <h1 className="text-2xl font-semibold">User Gallery</h1>
         
-        {error && (
+        {error instanceof Error && (
           <div className="bg-destructive/15 text-destructive px-4 py-2 rounded-md">
-            {error}
+            {error.message}
           </div>
         )}
         
@@ -156,14 +143,20 @@ export default function UserGallery() {
             <Input
               placeholder="Search images..."
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={(e) => {
+                setSearchTerm(e.target.value)
+                handleFilterChange()
+              }}
               className="pl-8"
             />
           </div>
           
           <Select 
             value={orientation} 
-            onValueChange={(value: string) => setOrientation(value as "all" | "horizontal" | "vertical" | "other")}
+            onValueChange={(value: string) => {
+              setOrientation(value as "all" | "horizontal" | "vertical" | "other")
+              handleFilterChange()
+            }}
           >
             <SelectTrigger>
               <SelectValue placeholder="Select orientation" />
@@ -179,7 +172,10 @@ export default function UserGallery() {
           <div className="flex gap-2">
             <Select 
               value={sortBy} 
-              onValueChange={(value: string) => setSortBy(value as "created_at" | "title" | "artist")}
+              onValueChange={(value: string) => {
+                setSortBy(value as "created_at" | "title" | "artist")
+                handleFilterChange()
+              }}
             >
               <SelectTrigger>
                 <SelectValue placeholder="Sort by" />
@@ -208,7 +204,7 @@ export default function UserGallery() {
       
       {/* Image Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {images.map((image) => (
+        {allImages.map((image: ImageObject) => (
           <Card key={image.id} className="overflow-hidden">
             <CardContent className="p-4">
               <div 
@@ -240,7 +236,7 @@ export default function UserGallery() {
       
       {/* Infinite scroll trigger */}
       <div ref={ref} className="h-10">
-        {loading && (
+        {isLoading && (
           <div className="flex justify-center">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
           </div>

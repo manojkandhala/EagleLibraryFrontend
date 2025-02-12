@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useUserStats } from "@/hooks/useQueries"
 import { Activity, CheckCircle, Clock, ImageIcon, RefreshCcw, TrendingUp } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
@@ -15,53 +15,9 @@ interface UserStats {
 }
 
 export default function UserDashboard() {
-  const [stats, setStats] = useState<UserStats | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState("")
-  const [refreshing, setRefreshing] = useState(false)
-  const [autoRefresh, setAutoRefresh] = useState(false)
+  const { data: stats, isLoading, error, refetch, isRefetching } = useUserStats()
 
-  useEffect(() => {
-    fetchStats()
-  }, [])
-
-  useEffect(() => {
-    let interval: NodeJS.Timeout
-    if (autoRefresh) {
-      interval = setInterval(fetchStats, 30000) // Refresh every 30 seconds
-    }
-    return () => clearInterval(interval)
-  }, [autoRefresh])
-
-  const fetchStats = async () => {
-    setRefreshing(true)
-    try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/users/my-stats`, {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-        },
-      })
-      if (!response.ok) throw new Error("Failed to fetch stats")
-      
-      const data = await response.json()
-      setStats(data)
-      setError("")
-    } catch (err) {
-      setError("Error loading statistics. Please try again.")
-      console.error("Error fetching stats:", err)
-    } finally {
-      setLoading(false)
-      setRefreshing(false)
-    }
-  }
-
-  const getCompletionRate = () => {
-    if (!stats) return 0
-    const total = stats.total_processed
-    return total > 0 ? Math.round((stats.completed / total) * 100) : 0
-  }
-
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="flex justify-center items-center min-h-[400px]">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
@@ -77,6 +33,11 @@ export default function UserDashboard() {
     )
   }
 
+  const getCompletionRate = () => {
+    const total = stats.total_processed
+    return total > 0 ? Math.round((stats.completed / total) * 100) : 0
+  }
+
   return (
     <div className="max-w-7xl mx-auto space-y-8">
       <div className="flex flex-col space-y-4 md:flex-row md:justify-between md:items-center md:space-y-0">
@@ -88,45 +49,22 @@ export default function UserDashboard() {
             Track your image processing activities and progress
           </p>
         </div>
-        <div className="flex items-center gap-3">
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setAutoRefresh(!autoRefresh)}
-                  className={cn(
-                    "gap-2 transition-all",
-                    autoRefresh && "text-primary hover:text-primary"
-                  )}
-                >
-                  <Clock className="h-4 w-4" />
-                  Auto Refresh
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>{autoRefresh ? 'Disable' : 'Enable'} auto refresh every 30 seconds</p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={fetchStats}
-            disabled={refreshing}
-            className="gap-2 transition-all hover:shadow-md"
-          >
-            <RefreshCcw className={cn("h-4 w-4", refreshing && "animate-spin")} />
-            Refresh Now
-          </Button>
-        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => refetch()}
+          disabled={isRefetching}
+          className="gap-2 transition-all hover:shadow-md"
+        >
+          <RefreshCcw className={cn("h-4 w-4", isRefetching && "animate-spin")} />
+          Refresh Now
+        </Button>
       </div>
 
       {error && (
         <div className="bg-destructive/15 text-destructive px-4 py-3 rounded-lg flex items-center gap-2 animate-in slide-in-from-top-2 duration-200">
           <Activity className="h-4 w-4" />
-          <span>{error}</span>
+          <span>Error loading statistics. Please try again.</span>
         </div>
       )}
 

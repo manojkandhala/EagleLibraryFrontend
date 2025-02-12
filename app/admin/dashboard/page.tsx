@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useAdminOverview } from "@/hooks/useQueries"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Activity, AlertCircle, Users, Image as ImageIcon, CheckCircle, Clock, ArrowUpRight, RefreshCcw } from "lucide-react"
@@ -24,52 +24,25 @@ interface UserStat {
   user: User
 }
 
+interface Activity {
+  image_id: number
+  user_id: number
+  action: string
+  timestamp: string
+}
+
 interface ProcessingOverview {
   total_images: number
   total_processing: number
   total_completed: number
   user_stats: UserStat[]
-  recent_activities: Array<{
-    image_id: number
-    user_id: number
-    action: string
-    timestamp: string
-  }>
+  recent_activities: Activity[]
 }
 
 export default function AdminDashboard() {
-  const [overview, setOverview] = useState<ProcessingOverview | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState("")
-  const [refreshing, setRefreshing] = useState(false)
+  const { data: overview, isLoading, error, refetch, isRefetching } = useAdminOverview()
 
-  useEffect(() => {
-    fetchOverview()
-  }, [])
-
-  const fetchOverview = async () => {
-    try {
-      setRefreshing(true)
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admin/processing-overview`, {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-        },
-      })
-      if (!response.ok) throw new Error("Failed to fetch overview")
-      
-      const data = await response.json()
-      setOverview(data)
-      setError("")
-    } catch (err) {
-      setError("Error loading dashboard data. Please try again.")
-      console.error("Error fetching overview:", err)
-    } finally {
-      setLoading(false)
-      setRefreshing(false)
-    }
-  }
-
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="flex justify-center items-center min-h-[400px]">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
@@ -99,11 +72,11 @@ export default function AdminDashboard() {
         <Button
           variant="outline"
           size="sm"
-          onClick={fetchOverview}
-          disabled={refreshing}
+          onClick={() => refetch()}
+          disabled={isRefetching}
           className="gap-2 transition-all hover:shadow-md"
         >
-          <RefreshCcw className={cn("h-4 w-4", refreshing && "animate-spin")} />
+          <RefreshCcw className={cn("h-4 w-4", isRefetching && "animate-spin")} />
           Refresh
         </Button>
       </div>
@@ -111,7 +84,7 @@ export default function AdminDashboard() {
       {error && (
         <div className="bg-destructive/15 text-destructive px-4 py-3 rounded-lg flex items-center gap-2 animate-in slide-in-from-top-2 duration-200">
           <AlertCircle className="h-4 w-4" />
-          <span>{error}</span>
+          <span>Error loading dashboard data. Please try again.</span>
         </div>
       )}
 
@@ -183,7 +156,7 @@ export default function AdminDashboard() {
           <CardContent>
             <div className="flex items-center justify-between">
               <div className="text-2xl font-bold text-amber-600">
-                {overview.user_stats.filter(stat => stat.in_progress > 0).length}
+                {overview.user_stats.filter((stat: UserStat) => stat.in_progress > 0).length}
               </div>
               <div className="bg-amber-100 text-amber-700 text-xs px-2 py-1 rounded-full group-hover:bg-amber-200 transition-colors">
                 Current
@@ -214,7 +187,7 @@ export default function AdminDashboard() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {overview.user_stats.map((stat) => (
+                  {overview.user_stats.map((stat: UserStat) => (
                     <TableRow 
                       key={stat.user.id} 
                       className="group hover:bg-muted/50 transition-colors"
@@ -283,7 +256,7 @@ export default function AdminDashboard() {
                       </TableCell>
                     </TableRow>
                   ) : (
-                    overview.recent_activities.map((activity, index) => (
+                    overview.recent_activities.map((activity: Activity, index: number) => (
                       <TableRow 
                         key={index} 
                         className="group hover:bg-muted/50 transition-colors"

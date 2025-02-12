@@ -1,12 +1,13 @@
-import "./globals.css"
+import type { Metadata } from "next"
 import { Inter } from "next/font/google"
-import type React from "react" // Import React
+import "./globals.css"
+import QueryProvider from "@/providers/QueryProvider"
 
 const inter = Inter({ subsets: ["latin"] })
 
-export const metadata = {
+export const metadata: Metadata = {
   title: "Eagle Library",
-  description: "Image processing and management system",
+  description: "AI-powered image processing and management",
 }
 
 export default function RootLayout({
@@ -16,7 +17,11 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className={inter.className}>{children}</body>
+      <body className={inter.className}>
+        <QueryProvider>
+          {children}
+        </QueryProvider>
+      </body>
     </html>
   )
 }

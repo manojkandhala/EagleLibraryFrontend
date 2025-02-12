@@ -1,6 +1,7 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
+import { useAdminUsers } from "@/hooks/useQueries"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -28,42 +29,13 @@ interface User {
 }
 
 export default function UserManagement() {
-  const [users, setUsers] = useState<User[]>([])
   const [isCreateUserOpen, setIsCreateUserOpen] = useState(false)
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
   const [userToDelete, setUserToDelete] = useState<User | null>(null)
   const [newUser, setNewUser] = useState({ email: "", username: "", temp_password: "", role: "user" })
-  const [loading, setLoading] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState("")
-
-  useEffect(() => {
-    fetchUsers()
-  }, [])
-
-  const fetchUsers = async () => {
-    try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/admin/users?skip=0&limit=100`, {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-        },
-      })
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.detail || "Failed to fetch users")
-      }
-      
-      const data = await response.json()
-      console.log('Users data:', data)
-      setUsers(Array.isArray(data) ? data : [])
-      setError("")
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Error loading users. Please try again.")
-      console.error("Error fetching users:", err)
-    } finally {
-      setLoading(false)
-    }
-  }
+  const { data: users = [], isLoading, refetch } = useAdminUsers()
 
   const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -87,7 +59,7 @@ export default function UserManagement() {
       
       setIsCreateUserOpen(false)
       setNewUser({ email: "", username: "", temp_password: "", role: "user" })
-      fetchUsers()
+      refetch()
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error creating user")
       console.error("Error creating user:", err)
@@ -113,12 +85,7 @@ export default function UserManagement() {
         throw new Error(errorData.detail || `Failed to ${action} user`)
       }
       
-      // Update the user's status locally
-      setUsers(prev => prev.map(user => 
-        user.id === userId 
-          ? { ...user, is_active: action === "activate" }
-          : user
-      ))
+      refetch()
       setError("")
     } catch (err) {
       setError(err instanceof Error ? err.message : `Error ${action}ing user`)
@@ -142,7 +109,7 @@ export default function UserManagement() {
         throw new Error(errorData.detail || "Failed to delete user")
       }
       
-      setUsers((prev) => prev.filter((user) => user.id !== userToDelete.id))
+      refetch()
       setError("")
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error deleting user")
@@ -153,7 +120,7 @@ export default function UserManagement() {
     }
   }
 
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="flex justify-center items-center min-h-[400px]">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
@@ -197,7 +164,7 @@ export default function UserManagement() {
                 </TableCell>
               </TableRow>
             ) : (
-              users.map((user) => (
+              users.map((user: User) => (
                 <TableRow key={user.id}>
                   <TableCell>{user.username}</TableCell>
                   <TableCell>{user.email}</TableCell>

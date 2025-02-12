@@ -1,6 +1,7 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
+import { useUserProcessing } from "@/hooks/useQueries"
 import { useRouter } from "next/navigation"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
@@ -20,45 +21,18 @@ interface ProcessingImage {
 
 export default function ProcessingPage() {
   const router = useRouter()
-  const [images, setImages] = useState<ProcessingImage[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState("")
-  const [refreshing, setRefreshing] = useState(false)
   const [selectedImage, setSelectedImage] = useState<ProcessingImage | null>(null)
+  const { data, isLoading, error, refetch, isRefetching } = useUserProcessing()
 
-  useEffect(() => {
-    fetchProcessingImages()
-  }, [])
-
-  const fetchProcessingImages = async () => {
-    try {
-      setRefreshing(true)
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/images/my-processing`, {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-        },
-      })
-      if (!response.ok) throw new Error("Failed to fetch processing images")
-      
-      const data = await response.json()
-      setImages(data.items)
-      setError("")
-    } catch (err) {
-      setError("Error loading processing images. Please try again.")
-      console.error("Error fetching images:", err)
-    } finally {
-      setLoading(false)
-      setRefreshing(false)
-    }
-  }
-
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="flex justify-center items-center min-h-[400px]">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
       </div>
     )
   }
+
+  const images = data?.items || []
 
   return (
     <div className="max-w-7xl mx-auto space-y-8">
@@ -75,11 +49,11 @@ export default function ProcessingPage() {
           <Button
             variant="outline"
             size="sm"
-            onClick={fetchProcessingImages}
-            disabled={refreshing}
+            onClick={() => refetch()}
+            disabled={isRefetching}
             className="gap-2 transition-all hover:shadow-md"
           >
-            <RefreshCcw className={cn("h-4 w-4", refreshing && "animate-spin")} />
+            <RefreshCcw className={cn("h-4 w-4", isRefetching && "animate-spin")} />
             Refresh
           </Button>
           <Button
@@ -97,7 +71,7 @@ export default function ProcessingPage() {
       {error && (
         <div className="bg-destructive/15 text-destructive px-4 py-3 rounded-lg flex items-center gap-2 animate-in slide-in-from-top-2 duration-200">
           <AlertCircle className="h-4 w-4" />
-          <span>{error}</span>
+          <span>Error loading processing images. Please try again.</span>
         </div>
       )}
 
@@ -123,7 +97,7 @@ export default function ProcessingPage() {
         </Card>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {images.map((image) => (
+          {images.map((image: ProcessingImage) => (
             <Card
               key={image.id}
               className="group hover:shadow-xl transition-all duration-300 hover:-translate-y-1 cursor-pointer"
