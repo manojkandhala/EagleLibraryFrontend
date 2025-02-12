@@ -54,6 +54,10 @@ export default function UserGallery() {
   const { ref, inView } = useInView({
     threshold: 0,
     rootMargin: "100px",
+    // Only trigger once the element is fully mounted
+    triggerOnce: false,
+    // Delay the observation to prevent immediate triggers
+    delay: 100,
   })
 
   // Memoize params creation to prevent unnecessary re-renders
@@ -90,9 +94,20 @@ export default function UserGallery() {
 
   // Load more when scrolling
   useEffect(() => {
-    if (!inView || !hasMore || isLoading) return
-    setPage(p => p + 1)
-  }, [inView, hasMore, isLoading])
+    // Don't trigger if:
+    // 1. Not in view
+    // 2. No more data
+    // 3. Currently loading
+    // 4. Initial page load (page === 1 && !data)
+    if (!inView || !hasMore || isLoading || (page === 1 && !data)) return
+
+    // Add a small delay to prevent rapid scrolling from triggering too many requests
+    const timer = setTimeout(() => {
+      setPage(p => p + 1)
+    }, 100)
+
+    return () => clearTimeout(timer)
+  }, [inView, hasMore, isLoading, page, data])
 
   // Reset page and images when filters change
   const handleFilterChange = useCallback(() => {

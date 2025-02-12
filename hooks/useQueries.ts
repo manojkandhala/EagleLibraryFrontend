@@ -55,8 +55,12 @@ export function useAdminOverview() {
 export function useAdminGallery(params: URLSearchParams) {
   return useQuery({
     queryKey: ["admin", "gallery", params.toString()],
-    queryFn: () => fetchWithAuth(`/images?${params.toString()}`),
+    queryFn: () => fetchWithAuth(`/images/?${params.toString()}`),
     ...realtimeQueryOptions,
+    staleTime: 1000 * 60 * 2, // Keep data fresh for 2 minutes
+    gcTime: 1000 * 60 * 5,    // Keep cache for 5 minutes
+    refetchOnMount: false,     // Don't refetch on mount
+    refetchOnWindowFocus: false // Don't refetch on window focus
   })
 }
 

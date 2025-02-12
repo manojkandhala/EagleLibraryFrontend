@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { useAdminGallery } from "@/hooks/useQueries"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -36,11 +36,11 @@ interface ImageObject {
 
 export default function AdminGallery() {
   const router = useRouter()
-  const [images, setImages] = useState<ImageObject[]>([])
+  const [page, setPage] = useState(1)
+  const [allImages, setAllImages] = useState<ImageObject[]>([])
   const [selectedImage, setSelectedImage] = useState<ImageObject | null>(null)
   const [isUpdateImageOpen, setIsUpdateImageOpen] = useState(false)
   const [updatedImage, setUpdatedImage] = useState<Partial<ImageObject>>({})
-  const [page, setPage] = useState(1)
   const [searchTerm, setSearchTerm] = useState("")
   const [orientation, setOrientation] = useState<"" | "horizontal" | "vertical" | "other">("")
   const [museum, setMuseum] = useState("")
@@ -50,44 +50,59 @@ export default function AdminGallery() {
   const { ref, inView } = useInView({
     threshold: 0,
     rootMargin: "100px",
+    triggerOnce: false,
+    delay: 100,
   })
 
-  const params = new URLSearchParams({
-    page: page.toString(),
-    page_size: "12",
-    sort_by: sortBy,
-    sort_order: sortOrder,
-  })
+  // Memoize params creation to prevent unnecessary re-renders
+  const params = useCallback(() => {
+    const p = new URLSearchParams({
+      page: page.toString(),
+      page_size: "12",
+      sort_by: sortBy,
+      sort_order: sortOrder,
+    })
 
-  if (searchTerm) params.append("search_term", searchTerm)
-  if (orientation) params.append("orientation", orientation)
-  if (museum) params.append("museum", museum)
+    if (searchTerm) p.append("search_term", searchTerm)
+    if (orientation) p.append("orientation", orientation)
+    if (museum) p.append("museum", museum)
 
-  const { data, isLoading, error, refetch } = useAdminGallery(params)
+    return p
+  }, [page, sortBy, sortOrder, searchTerm, orientation, museum])
 
-  // Update images when data changes
+  const { data, isLoading, error, refetch } = useAdminGallery(params())
+  const hasMore = data?.has_next || false
+
+  // Update allImages when new data arrives
   useEffect(() => {
-    if (data?.items) {
-      if (page === 1) {
-        setImages(data.items)
-      } else {
-        setImages((prev) => [...prev, ...data.items])
-      }
-    }
+    if (!data?.items) return
+
+    setAllImages(prev => {
+      if (page === 1) return data.items
+      // Prevent duplicate images
+      const newImages = data.items.filter(
+        (newImg: ImageObject) => !prev.some((existingImg: ImageObject) => existingImg.id === newImg.id)
+      )
+      return [...prev, ...newImages]
+    })
   }, [data, page])
 
   // Load more when scrolling
   useEffect(() => {
-    if (inView && data?.has_next && !isLoading) {
-      setPage((p) => p + 1)
-    }
-  }, [inView, data?.has_next, isLoading])
+    if (!inView || !hasMore || isLoading || (page === 1 && !data)) return
 
-  // Reset page when filters change
-  useEffect(() => {
+    const timer = setTimeout(() => {
+      setPage(p => p + 1)
+    }, 100)
+
+    return () => clearTimeout(timer)
+  }, [inView, hasMore, isLoading, page, data])
+
+  // Reset page and images when filters change
+  const handleFilterChange = useCallback(() => {
     setPage(1)
-    setImages([])
-  }, [searchTerm, orientation, museum, sortBy, sortOrder])
+    setAllImages([])
+  }, [])
 
   const handleUpdateImage = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -105,8 +120,7 @@ export default function AdminGallery() {
       if (response.ok) {
         setIsUpdateImageOpen(false)
         setUpdatedImage({})
-        setPage(1)
-        setImages([])
+        handleFilterChange()
         refetch()
       } else {
         console.error("Failed to update image")
@@ -128,18 +142,10 @@ export default function AdminGallery() {
       })
       if (!response.ok) throw new Error("Failed to delete image")
       
-      setImages((prev) => prev.filter((img) => img.id !== imageId))
+      setAllImages((prev) => prev.filter((img) => img.id !== imageId))
     } catch (err) {
       console.error("Error deleting image:", err)
     }
-  }
-
-  if (isLoading && page === 1) {
-    return (
-      <div className="flex justify-center items-center min-h-[400px]">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-      </div>
-    )
   }
 
   return (
@@ -148,9 +154,9 @@ export default function AdminGallery() {
         <h1 className="text-3xl font-bold">Admin Gallery</h1>
       </div>
       
-      {error && (
+      {error instanceof Error && (
         <div className="bg-destructive/15 text-destructive px-4 py-2 rounded-md">
-          Error loading images. Please try again.
+          {error.message}
         </div>
       )}
 
@@ -159,12 +165,18 @@ export default function AdminGallery() {
           <Input
             placeholder="Search by title, artist, or tags..."
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={(e) => {
+              setSearchTerm(e.target.value)
+              handleFilterChange()
+            }}
             className="flex-1"
           />
           <select
             value={orientation}
-            onChange={(e) => setOrientation(e.target.value as any)}
+            onChange={(e) => {
+              setOrientation(e.target.value as any)
+              handleFilterChange()
+            }}
             className="h-10 rounded-md border border-input bg-transparent px-3 py-1"
           >
             <option value="">All Orientations</option>
@@ -175,14 +187,20 @@ export default function AdminGallery() {
           <Input
             placeholder="Filter by museum..."
             value={museum}
-            onChange={(e) => setMuseum(e.target.value)}
+            onChange={(e) => {
+              setMuseum(e.target.value)
+              handleFilterChange()
+            }}
             className="flex-1 sm:max-w-[200px]"
           />
         </div>
         <div className="flex gap-4">
           <select
             value={sortBy}
-            onChange={(e) => setSortBy(e.target.value as any)}
+            onChange={(e) => {
+              setSortBy(e.target.value as any)
+              handleFilterChange()
+            }}
             className="h-10 rounded-md border border-input bg-transparent px-3 py-1"
           >
             <option value="created_at">Sort by Date</option>
@@ -191,7 +209,10 @@ export default function AdminGallery() {
           </select>
           <select
             value={sortOrder}
-            onChange={(e) => setSortOrder(e.target.value as any)}
+            onChange={(e) => {
+              setSortOrder(e.target.value as any)
+              handleFilterChange()
+            }}
             className="h-10 rounded-md border border-input bg-transparent px-3 py-1"
           >
             <option value="desc">Descending</option>
@@ -201,7 +222,7 @@ export default function AdminGallery() {
       </div>
       
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {images.map((image) => (
+        {allImages.map((image: ImageObject) => (
           <Card key={image.id} className="overflow-hidden group">
             <CardContent className="p-4">
               <div 
@@ -248,9 +269,12 @@ export default function AdminGallery() {
             </CardContent>
           </Card>
         ))}
-        {/* Infinite scroll trigger */}
-        {data?.has_next && (
-          <div ref={ref} className="col-span-full flex justify-center p-4">
+      </div>
+
+      {/* Infinite scroll trigger */}
+      <div ref={ref} className="h-10">
+        {isLoading && (
+          <div className="flex justify-center">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
           </div>
         )}
