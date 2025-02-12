@@ -3,7 +3,8 @@
 import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { AlertCircle } from "lucide-react"
+import { Activity, AlertCircle, Users, Image as ImageIcon, CheckCircle, Clock, ArrowUpRight } from "lucide-react"
+import { cn } from "@/lib/utils"
 
 interface User {
   id: number
@@ -82,8 +83,13 @@ export default function AdminDashboard() {
   }
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-3xl font-bold">Dashboard</h1>
+    <div className="space-y-8">
+      <div className="flex justify-between items-center">
+        <h1 className="text-3xl font-bold">Dashboard Overview</h1>
+        <span className="text-sm text-muted-foreground">
+          Last updated: {new Date().toLocaleString()}
+        </span>
+      </div>
 
       {error && (
         <div className="bg-destructive/15 text-destructive px-4 py-2 rounded-md flex items-center gap-2">
@@ -92,44 +98,81 @@ export default function AdminDashboard() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>Total Images</CardTitle>
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <Card className="bg-gradient-to-br from-blue-50 to-white hover:shadow-md transition-all">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Total Images</CardTitle>
+            <ImageIcon className="h-4 w-4 text-blue-500" />
           </CardHeader>
           <CardContent>
-            <p className="text-4xl font-bold">{overview.total_images}</p>
+            <div className="flex items-center justify-between">
+              <div className="text-2xl font-bold text-blue-600">{overview.total_images}</div>
+              <div className="bg-blue-100 text-blue-700 text-xs px-2 py-1 rounded-full">
+                All Time
+              </div>
+            </div>
           </CardContent>
         </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle>Processing</CardTitle>
+
+        <Card className="bg-gradient-to-br from-purple-50 to-white hover:shadow-md transition-all">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Processing</CardTitle>
+            <Clock className="h-4 w-4 text-purple-500" />
           </CardHeader>
           <CardContent>
-            <p className="text-4xl font-bold">{overview.total_processing}</p>
+            <div className="flex items-center justify-between">
+              <div className="text-2xl font-bold text-purple-600">{overview.total_processing}</div>
+              <div className="bg-purple-100 text-purple-700 text-xs px-2 py-1 rounded-full">
+                Active
+              </div>
+            </div>
           </CardContent>
         </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle>Completed</CardTitle>
+
+        <Card className="bg-gradient-to-br from-green-50 to-white hover:shadow-md transition-all">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Completed</CardTitle>
+            <CheckCircle className="h-4 w-4 text-green-500" />
           </CardHeader>
           <CardContent>
-            <p className="text-4xl font-bold">{overview.total_completed}</p>
+            <div className="flex items-center justify-between">
+              <div className="text-2xl font-bold text-green-600">{overview.total_completed}</div>
+              <div className="bg-green-100 text-green-700 text-xs px-2 py-1 rounded-full">
+                Success
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-gradient-to-br from-amber-50 to-white hover:shadow-md transition-all">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Active Users</CardTitle>
+            <Users className="h-4 w-4 text-amber-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center justify-between">
+              <div className="text-2xl font-bold text-amber-600">
+                {overview.user_stats.filter(stat => stat.in_progress > 0).length}
+              </div>
+              <div className="bg-amber-100 text-amber-700 text-xs px-2 py-1 rounded-full">
+                Current
+              </div>
+            </div>
           </CardContent>
         </Card>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* User Stats */}
         <Card>
-          <CardHeader>
-            <CardTitle>User Statistics</CardTitle>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle className="text-lg font-semibold">User Statistics</CardTitle>
+            <Activity className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="rounded-md border">
+            <div className="rounded-lg border bg-card">
               <Table>
                 <TableHeader>
-                  <TableRow>
+                  <TableRow className="hover:bg-transparent">
                     <TableHead>User</TableHead>
                     <TableHead>Role</TableHead>
                     <TableHead>Processed</TableHead>
@@ -138,11 +181,27 @@ export default function AdminDashboard() {
                 </TableHeader>
                 <TableBody>
                   {overview.user_stats.map((stat) => (
-                    <TableRow key={stat.user.id}>
-                      <TableCell>{stat.user.username}</TableCell>
-                      <TableCell className="capitalize">{stat.user.role}</TableCell>
+                    <TableRow key={stat.user.id} className="group">
+                      <TableCell className="font-medium">{stat.user.username}</TableCell>
+                      <TableCell>
+                        <span className={cn(
+                          "px-2 py-1 rounded-full text-xs capitalize",
+                          stat.user.role === "admin" 
+                            ? "bg-blue-100 text-blue-700" 
+                            : "bg-slate-100 text-slate-700"
+                        )}>
+                          {stat.user.role}
+                        </span>
+                      </TableCell>
                       <TableCell>{stat.total_processed}</TableCell>
-                      <TableCell>{stat.in_progress}</TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          {stat.in_progress}
+                          {stat.in_progress > 0 && (
+                            <div className="h-2 w-2 rounded-full bg-amber-500 animate-pulse" />
+                          )}
+                        </div>
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -151,16 +210,16 @@ export default function AdminDashboard() {
           </CardContent>
         </Card>
 
-        {/* Recent Activities */}
         <Card>
-          <CardHeader>
-            <CardTitle>Recent Activities</CardTitle>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle className="text-lg font-semibold">Recent Activities</CardTitle>
+            <ArrowUpRight className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="rounded-md border">
+            <div className="rounded-lg border bg-card">
               <Table>
                 <TableHeader>
-                  <TableRow>
+                  <TableRow className="hover:bg-transparent">
                     <TableHead>Image ID</TableHead>
                     <TableHead>User ID</TableHead>
                     <TableHead>Action</TableHead>
@@ -170,17 +229,31 @@ export default function AdminDashboard() {
                 <TableBody>
                   {overview.recent_activities.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={4} className="text-center py-4 text-muted-foreground">
+                      <TableCell 
+                        colSpan={4} 
+                        className="text-center py-4 text-muted-foreground"
+                      >
                         No recent activities
                       </TableCell>
                     </TableRow>
                   ) : (
                     overview.recent_activities.map((activity, index) => (
-                      <TableRow key={index}>
-                        <TableCell>{activity.image_id}</TableCell>
-                        <TableCell>{activity.user_id}</TableCell>
-                        <TableCell className="capitalize">{activity.action}</TableCell>
+                      <TableRow key={index} className="group">
+                        <TableCell className="font-medium">#{activity.image_id}</TableCell>
+                        <TableCell>#{activity.user_id}</TableCell>
                         <TableCell>
+                          <span className={cn(
+                            "px-2 py-1 rounded-full text-xs capitalize",
+                            activity.action.includes("start") 
+                              ? "bg-amber-100 text-amber-700"
+                              : activity.action.includes("complete")
+                              ? "bg-green-100 text-green-700"
+                              : "bg-slate-100 text-slate-700"
+                          )}>
+                            {activity.action}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-sm text-muted-foreground">
                           {new Date(activity.timestamp).toLocaleString()}
                         </TableCell>
                       </TableRow>
