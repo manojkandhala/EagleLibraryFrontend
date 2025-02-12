@@ -116,24 +116,26 @@ export default function AdminGallery() {
 
     setIsSubmitting(true)
     try {
-      // Find which field was changed
-      const changedField = Object.entries(updatedImage).find(([key, value]) => 
-        value !== selectedImage[key as keyof ImageObject]
-      )
+      // Find which fields have changed
+      const changedFields = Object.entries(updatedImage).reduce((acc, [key, value]) => {
+        if (selectedImage && value !== selectedImage[key as keyof ImageObject]) {
+          // Handle empty processor_id correctly
+          if (key === 'processor_id' && (value === undefined || value === 0)) {
+            acc[key] = null
+          } else {
+            acc[key] = value
+          }
+        }
+        return acc
+      }, {} as Record<string, any>)
 
-      if (!changedField) {
+      if (Object.keys(changedFields).length === 0) {
         setIsUpdateImageOpen(false)
         setIsSubmitting(false)
         return
       }
 
-      // Only send the changed field
-      const [fieldName, newValue] = changedField
-      const updatePayload = {
-        [fieldName]: newValue
-      }
-
-      console.log('Sending update:', updatePayload)
+      console.log('Sending update:', changedFields)
 
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/images/${selectedImage.id}`, {
         method: "PUT",
@@ -142,7 +144,7 @@ export default function AdminGallery() {
           "Authorization": `Bearer ${localStorage.getItem("token")}`,
           "Content-Type": "application/json"
         },
-        body: JSON.stringify(updatePayload)
+        body: JSON.stringify(changedFields)
       })
 
       const responseData = await response.text()
@@ -150,7 +152,7 @@ export default function AdminGallery() {
 
       if (!response.ok) {
         const errorData = JSON.parse(responseData)
-        throw new Error(errorData.detail?.[0]?.msg || "Failed to update image")
+        throw new Error(errorData.detail || "Failed to update image")
       }
 
       // Close dialog and reset state

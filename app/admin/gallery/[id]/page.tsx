@@ -79,7 +79,12 @@ export default function ImageDetailsPage() {
       // Find which fields have changed
       const changedFields = Object.entries(updatedImage).reduce((acc, [key, value]) => {
         if (image && value !== image[key as keyof ImageObject]) {
-          acc[key] = value
+          // Handle empty processor_id correctly
+          if (key === 'processor_id' && (value === undefined || value === 0)) {
+            acc[key] = null
+          } else {
+            acc[key] = value
+          }
         }
         return acc
       }, {} as Record<string, any>)
@@ -107,7 +112,7 @@ export default function ImageDetailsPage() {
 
       if (!response.ok) {
         const errorData = JSON.parse(responseData)
-        throw new Error(errorData.detail?.[0]?.msg || "Failed to update image")
+        throw new Error(errorData.detail || "Failed to update image")
       }
       
       await fetchImageDetails()
