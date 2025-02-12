@@ -48,6 +48,7 @@ export default function LoginForm() {
         const data = await response.json()
         localStorage.setItem("token", data.access_token)
         localStorage.setItem("role", data.role)
+        localStorage.setItem("refresh_token", data.refresh_token)
         router.push(data.role === "admin" ? "/admin/dashboard" : "/user/dashboard")
       } else {
         setError("Invalid credentials")

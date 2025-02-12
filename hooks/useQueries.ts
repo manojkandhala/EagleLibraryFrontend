@@ -6,8 +6,43 @@ const fetchWithAuth = async (url: string) => {
       Authorization: `Bearer ${localStorage.getItem("token")}`,
     },
   })
-  if (!response.ok) throw new Error("API request failed")
-  return response.json()
+  if (response.ok) return response.json()
+
+  if (response.status === 401) {
+    // Attempt token refresh
+    const refreshResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/token/refresh`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: new URLSearchParams({
+        refresh_token: localStorage.getItem("refresh_token") || "",
+      }),
+    });
+
+    if (refreshResponse.ok) {
+      const refreshData = await refreshResponse.json();
+      localStorage.setItem("token", refreshData.access_token);
+      localStorage.setItem("refresh_token", refreshData.refresh_token);
+      // Retry original request with new token
+      const retryResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}${url}`, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      });
+      if (!retryResponse.ok) throw new Error("API request failed after token refresh");
+      return retryResponse.json();
+    } else {
+      // Token refresh failed, redirect to login
+      localStorage.removeItem("token");
+      localStorage.removeItem("role");
+      localStorage.removeItem("refresh_token");
+      window.location.href = "/"; // Redirect to home page (login form)
+      throw new Error("Token refresh failed"); // To prevent further execution
+    }
+  }
+
+  throw new Error("API request failed"); // General error for other non-401 errors
 }
 
 // Common query options for user-related queries
@@ -90,4 +125,4 @@ export function useUserGallery(params: URLSearchParams) {
     refetchOnWindowFocus: true, // Refetch when window gains focus
     retry: 1
   })
-} 
+}
