@@ -35,24 +35,27 @@ export default function UserLayout({
   const queryClient = useQueryClient();
 
   const handleLogout = async () => {
+    const token = localStorage.getItem("token")
+    
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/logout`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-        },
-      })
-      
-      if (response.ok) {
-        localStorage.removeItem("token")
-        localStorage.removeItem("role")
-        localStorage.removeItem("refresh_token")
-        queryClient.invalidateQueries({ queryKey: ["user", "me"] });
-        router.push("/")
-        router.refresh()
+      // Make the logout API call first while we still have the token
+      if (token) {
+        await fetch(`${process.env.NEXT_PUBLIC_API_URL}/logout`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        })
       }
     } catch (error) {
       console.error("Error logging out:", error)
+    } finally {
+      // Clear all tokens and cache after API call
+      localStorage.removeItem("token")
+      localStorage.removeItem("refresh_token")
+      localStorage.removeItem("role")
+      queryClient.clear()
+      router.replace("/")
     }
   }
 

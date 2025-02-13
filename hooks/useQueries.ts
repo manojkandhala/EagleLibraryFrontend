@@ -66,9 +66,27 @@ const realtimeQueryOptions = {
 export function useCurrentUser() {
   return useQuery({
     queryKey: ["user", "me"],
-    queryFn: () => fetchWithAuth("/users/me"),
-    ...userQueryOptions,
-  })
+    queryFn: async () => {
+      const token = localStorage.getItem("token");
+      if (!token) {
+        return null;
+      }
+      
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/users/me`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      
+      if (!response.ok) {
+        throw new Error("Failed to fetch user");
+      }
+      
+      return response.json();
+    },
+    retry: false,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  });
 }
 
 export function useAdminUsers() {
