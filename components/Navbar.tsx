@@ -3,13 +3,17 @@
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
+import { useQueryClient } from "@tanstack/react-query";
 
 export default function Navbar() {
   const router = useRouter()
+  const queryClient = useQueryClient();
 
   const handleLogout = () => {
     localStorage.removeItem("token")
     localStorage.removeItem("role")
+    localStorage.removeItem("refresh_token")
+    queryClient.invalidateQueries({ queryKey: ["user", "me"] });
     router.push("/")
   }
 
@@ -41,4 +45,3 @@ export default function Navbar() {
     </nav>
   )
 }
-

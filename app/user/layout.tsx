@@ -15,6 +15,7 @@ import {
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { User } from "lucide-react"
 import { useCurrentUser } from "@/hooks/useQueries"
+import { useQueryClient } from "@tanstack/react-query";
 
 interface UserProfile {
   id: number
@@ -31,6 +32,7 @@ export default function UserLayout({
   const pathname = usePathname()
   const router = useRouter()
   const { data: user } = useCurrentUser()
+  const queryClient = useQueryClient();
 
   const handleLogout = async () => {
     try {
@@ -43,6 +45,9 @@ export default function UserLayout({
       
       if (response.ok) {
         localStorage.removeItem("token")
+        localStorage.removeItem("role")
+        localStorage.removeItem("refresh_token")
+        queryClient.invalidateQueries({ queryKey: ["user", "me"] });
         router.push("/")
         router.refresh()
       }
@@ -150,4 +155,4 @@ export default function UserLayout({
       </main>
     </div>
   )
-} 
+}
